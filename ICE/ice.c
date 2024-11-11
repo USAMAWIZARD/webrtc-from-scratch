@@ -31,7 +31,6 @@
 // candidate:2764676115 1 udp 2122194687 192.168.0.110 37515 typ host generation
 // 0 ufrag 0KCc network-id 2 network-cost 10
 
-// fix thread safty
 bool parse_ice_candidate(struct RTCIecCandidates *candidate) {
 
   if (candidate == NULL) {
@@ -383,6 +382,7 @@ guint do_ice_handshake(struct RTCPeerConnection *peer) {
       printf("\n ice handshake request sent form %s://%s:%d to %s://%s:%d\n",
              pair->p0->transport, pair->p0->address, pair->p0->port,
              pair->p1->transport, pair->p1->address, pair->p1->port);
+
       if (pair->state == ICE_PAIR_WAITING) {
         pair->state = ICE_PAIR_INPROGRESS;
         return 0;

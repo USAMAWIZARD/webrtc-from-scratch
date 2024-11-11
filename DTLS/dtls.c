@@ -386,7 +386,7 @@ uint8_t make_dtls_packet(struct RTCDtlsTransport *transport, struct iovec *iov,
     g_hmac_update(hmac, dtls_payload, payload_len);
     //
 
-    guchar *dtls_packet_mac = malloc(hmac_len);
+    guchar dtls_packet_mac[hmac_len];
     g_hmac_get_digest(hmac, dtls_packet_mac, &hmac_len);
     memcpy(ptr, dtls_packet_mac, hmac_len);
 

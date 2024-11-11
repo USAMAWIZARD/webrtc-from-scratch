@@ -82,15 +82,13 @@ get_srtp_enryption_keys(struct RTCDtlsTransport *transport, guchar *key_block) {
   encryption_keys->client_write_IV = malloc(cipher_info->iv_size);
   encryption_keys->server_write_IV = malloc(cipher_info->iv_size);
 
-  gsize srtp_key_size = cipher_info->key_size,
-        salt_key_len = cipher_info->salt_key_len,
-        mac_size = cipher_info->hmac_len,
-        mac_key_size = cipher_info->hmac_key_len;
+  copy_key_block(
+      key_block, &encryption_keys->client_write_key, cipher_info->key_size,
+      &encryption_keys->server_write_key, cipher_info->key_size,
+      &encryption_keys->client_write_SRTP_salt, cipher_info->salt_key_len,
+      &encryption_keys->server_write_SRTP_salt, cipher_info->salt_key_len,
+      NULL);
 
-  copy_key_block(key_block, &encryption_keys->client_write_key, srtp_key_size,
-                 &encryption_keys->server_write_key, srtp_key_size,
-                 &encryption_keys->client_write_SRTP_salt, salt_key_len,
-                 &encryption_keys->server_write_SRTP_salt, salt_key_len, NULL);
   printf("------DTLS EXPORTER ------\n");
   printf("Master Srtp Client write key: \n");
   print_hex(encryption_keys->client_write_key, cipher_info->key_size);
@@ -117,15 +115,13 @@ get_dtls_encryption_keys(struct RTCDtlsTransport *transport,
   encryption_keys->client_write_IV = malloc(cipher_info->iv_size);
   encryption_keys->server_write_IV = malloc(cipher_info->iv_size);
 
-  gsize key_size = cipher_info->key_size, iv_size = cipher_info->iv_size,
-        hash_size = cipher_info->hmac_len;
-
-  copy_key_block(key_block, &encryption_keys->client_write_mac_key, hash_size,
-                 &encryption_keys->server_write_mac_key, hash_size,
-                 &encryption_keys->client_write_key, key_size,
-                 &encryption_keys->server_write_key, key_size,
-                 &encryption_keys->client_write_IV, iv_size,
-                 &encryption_keys->server_write_IV, iv_size, NULL);
+  copy_key_block(key_block, &encryption_keys->client_write_mac_key,
+                 cipher_info->hmac_len, &encryption_keys->server_write_mac_key,
+                 cipher_info->hmac_len, &encryption_keys->client_write_key,
+                 cipher_info->key_size, &encryption_keys->server_write_key,
+                 cipher_info->key_size, &encryption_keys->client_write_IV,
+                 cipher_info->iv_size, &encryption_keys->server_write_IV,
+                 cipher_info->iv_size, NULL);
 
   return encryption_keys;
 }
@@ -193,6 +189,7 @@ bool init_symitric_encryption(struct RTCDtlsTransport *transport) {
 
   struct encryption_keys *encryption_keys =
       get_dtls_encryption_keys(transport, key_block);
+  free(key_block);
 
   init_enryption_ctx(&transport->dtls_symitric_encrypt, encryption_keys,
                      transport->dtls_cipher_suite);
@@ -205,6 +202,7 @@ bool init_symitric_encryption(struct RTCDtlsTransport *transport) {
           G_CHECKSUM_SHA256, 128);
 
   encryption_keys = get_srtp_enryption_keys(transport, key_block);
+  free(key_block);
 
   init_enryption_ctx(&transport->srtp_symitric_encrypt, encryption_keys,
                      transport->srtp_cipher_suite);

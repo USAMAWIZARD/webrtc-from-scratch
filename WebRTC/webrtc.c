@@ -3,6 +3,7 @@
 #include "../ICE/ice.h"
 #include "../Network/network.h"
 #include "../SDP/sdp.h"
+#include "glib-object.h"
 #include "glib.h"
 #include <stdbool.h>
 #include <stdio.h>

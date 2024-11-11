@@ -70,7 +70,6 @@ char *get_ip_str(const struct sockaddr *sa, char *s_ip, uint16_t *port,
 
 // todo: change here to support diffrent bundle policy make thread argument more
 // robust
-//
 void *packet_listner_thread(void *peer_v) {
   struct RTCPeerConnection *peer = (struct RTCPeerConnection *)peer_v;
   uint16_t sport;
