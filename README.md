@@ -2,11 +2,15 @@
 # TODO List
 
 - [ ] Signal passing for callbacks
+- [ ] make it browser compatible
+- [ ] add basic security checks
 - [ ] make encrypt decrypt more robust
 - [ ] DTLS decryption
 - [ ] Implement state changes for ICE, DTLS, and WebRTC
-- [ ] Refactor code
+- [ ] refactor implementation
 - [ ] Complete DTLS finish message verification
+
+
 ** 
 This project tries to implement a very minamal webrtc implementation without considering much about to learn and understand in depth how WebRTC works  <br>
 
