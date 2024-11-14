@@ -1,4 +1,13 @@
+** still under development 
+# TODO List
 
+- [ ] Signal passing for callbacks
+- [ ] make encrypt decrypt more robust
+- [ ] DTLS decryption
+- [ ] Implement state changes for ICE, DTLS, and WebRTC
+- [ ] Refactor code
+- [ ] Complete DTLS finish message verification
+** 
 This project tries to implement a very minamal webrtc implementation without considering much about to learn and understand in depth how WebRTC works  <br>
 
 It will make a WebRTC connection from another peer and send a stream in the simplest way possible <br>
