@@ -4,7 +4,7 @@
 - [ ] Signal passing for callbacks
 - [ ] make it browser compatible
 - [ ] add basic security checks
-- [ ] make encrypt decrypt more robust
+- [ ] refactor encryption and decryption logic
 - [ ] DTLS decryption
 - [ ] Implement state changes for ICE, DTLS, and WebRTC
 - [ ] refactor implementation
