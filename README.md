@@ -9,6 +9,7 @@
 - [ ] Implement state changes for ICE, DTLS, and WebRTC
 - [ ] refactor implementation
 - [ ] Complete DTLS finish message verification
+- [ ] Threading
 
 
 ** 
