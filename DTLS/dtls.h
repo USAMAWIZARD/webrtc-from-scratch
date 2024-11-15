@@ -64,6 +64,7 @@ enum ContentType {
   content_type_handshake,
   content_type_application_data
 };
+struct Negosiated {};
 
 struct RTCDtlsTransport {
   enum DTLS_MODE mode;
@@ -87,13 +88,14 @@ struct RTCDtlsTransport {
   EVP_PKEY *pub_key;
   EVP_PKEY *my_private_key;
   EVP_PKEY *my_public_key;
+
   struct encryption_keys *encryption_keys;
 
   struct cipher_suite_info *dtls_cipher_suite;
   struct cipher_suite_info *srtp_cipher_suite;
 
-  union symmetric_encrypt dtls_symitric_encrypt;
-  union symmetric_encrypt srtp_symitric_encrypt;
+  struct dtls_ctx *dtls_ctx;
+  struct srtp_ctx *srtp_ctx;
 };
 
 struct DtlsEncryptionCtx {

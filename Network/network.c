@@ -109,7 +109,8 @@ void *packet_listner_thread(void *peer_v) {
         printf("error something went wrong when reciving stun response %d",
                errno);
 
-      struct NetworkPacket *packet = get_parsed_packet(udp_packet, bytes);
+      struct NetworkPacket *packet =
+          get_parsed_packet(peer->dtls_transport, udp_packet, bytes);
 
       if (!packet) {
         printf("packet detected a NULL\n");
@@ -149,7 +150,8 @@ void *packet_listner_thread(void *peer_v) {
   }
   return 0;
 }
-struct NetworkPacket *get_parsed_packet(guchar *packet, uint32_t bytes) {
+struct NetworkPacket *get_parsed_packet(struct RTCDtlsTransport *dtls_transport,
+                                        guchar *packet, uint32_t bytes) {
 
   // check if its a STUN
   struct NetworkPacket *network_packet = malloc(sizeof(struct NetworkPacket));
@@ -217,23 +219,33 @@ struct NetworkPacket *get_parsed_packet(guchar *packet, uint32_t bytes) {
     while (remaining_bytes > 0) {
 
       if (remaining_bytes < dtls_header_size) {
+        printf("%d rem\n", remaining_bytes);
+        exit(0);
         return NULL;
       }
       struct DtlsHeader *dtls_header = malloc(dtls_header_size);
-
+      dtls_packet->dtls_header = dtls_header;
       memcpy(dtls_header, packet, dtls_header_size);
+      dtls_header->length = ntohs(dtls_header->length);
+      dtls_header->epoch = htons(dtls_header->epoch);
 
       remaining_bytes = remaining_bytes - dtls_header_size;
       packet = packet + dtls_header_size;
-      dtls_packet->dtls_header = dtls_header;
-      uint16_t isencrypted = ntohs(dtls_header->epoch);
 
-      if (isencrypted)
-        dtls_packet->isencrypted = true;
+      if (dtls_header->epoch) {
+        if (dtls_transport->dtls_ctx != NULL) {
 
-      if (isencrypted || dtls_header->type != 22) {
+          dtls_header->length =
+              decrypt_dtls(dtls_transport, &packet, dtls_header->length);
+          remaining_bytes = dtls_header->length; // fix here
 
-        uint16_t header_paylod_size = ntohs(dtls_header->length);
+        } else
+          g_error("recived encrypted packet but dtls context is null");
+      }
+
+      if (dtls_header->type != 22) {
+
+        uint16_t header_paylod_size = dtls_header->length;
 
         if (remaining_bytes < header_paylod_size) {
           return NULL;
@@ -281,6 +293,7 @@ struct NetworkPacket *get_parsed_packet(guchar *packet, uint32_t bytes) {
       if (remaining_bytes != 0 && remaining_bytes >= fragment_len) {
 
         if (length < fragment_offset + fragment_len) {
+
           return NULL;
         }
 

@@ -49,23 +49,25 @@ struct AesEnryptionCtx {
 struct dtls_ctx {
   struct DtlsEncryptionCtx *client;
   struct DtlsEncryptionCtx *server;
-  void (*encrypt_func)(void *encryption_ctx, uint8_t *block_data,
-                       uint16_t block_encrypt_offset,
-                       uint32_t total_packet_len);
+  uint32_t (*encrypt_func)(void *encryption_ctx, uint8_t *block_data,
+                           uint16_t block_encrypt_offset,
+                           uint32_t total_packet_len);
+  uint32_t (*decrypt_func)(void *encryption_ctx, uint8_t *block_data,
+                           uint16_t block_encrypt_offset,
+                           uint32_t total_packet_len);
 };
 
 struct srtp_ctx {
   struct SrtpEncryptionCtx *client;
   struct SrtpEncryptionCtx *server;
-  void (*encrypt_func)(void *encryption_ctx, uint8_t *block_data,
-                       uint16_t block_encrypt_offset,
-                       uint32_t total_packet_len);
+  uint32_t (*encrypt_func)(void *encryption_ctx, uint8_t *block_data,
+                           uint16_t block_encrypt_offset,
+                           uint32_t total_packet_len);
+  uint32_t (*decrypt_func)(void *encryption_ctx, uint8_t *block_data,
+                           uint16_t block_encrypt_offset,
+                           uint32_t total_packet_len);
 };
 
-union symmetric_encrypt {
-  struct dtls_ctx *dtls;
-  struct srtp_ctx *srtp;
-};
 struct cipher_suite_info {
   uint16_t selected_cipher_suite;
   enum symitric_encrypt_algo symitric_algo;
@@ -113,10 +115,6 @@ bool parse_encryption_key_block(struct RTCDtlsTransport *transport,
 
 bool init_symitric_encryption(struct RTCDtlsTransport *transport);
 
-bool init_enryption_ctx(union symmetric_encrypt *symitric_encrypt,
-                        struct encryption_keys *encryption_keys,
-                        struct cipher_suite_info *cipher_info);
-
 struct AesEnryptionCtx *init_aes(struct AesEnryptionCtx **encryption_ctx,
                                  guchar *write_key, uint16_t write_key_size,
                                  guchar *write_mac_key, uint16_t mac_key_size,
@@ -137,10 +135,14 @@ uint32_t decrypt_aes(struct AesEnryptionCtx *ctx, uint8_t *block_data,
 
 void transpose_matrix(uint8_t (*round_key)[4]);
 
-bool init_dtls_ctx(union symmetric_encrypt *encryption_ctx,
+bool init_dtls_ctx(struct dtls_ctx *dtls_ctx,
                    struct encryption_keys *encryption_keys,
                    struct cipher_suite_info *cipher_info);
 
 bool set_cipher_suite_info(struct cipher_suite_info **pp_cipher_suite_info,
                            uint16_t selected_cipher_suite);
+uint32_t decrypt_dtls(struct RTCDtlsTransport *dtls_transport, guchar **block,
+                      uint32_t length);
+uint32_t encrypt_dtls(struct RTCDtlsTransport *dtls_transport, guchar *block,
+                      uint32_t length);
 #endif // !_ENRYPTIONH_

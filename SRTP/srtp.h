@@ -11,8 +11,6 @@
 
 struct Rtp;
 
-union symmetric_encrypt;
-
 struct __attribute__((packed)) srtp_ext {
   uint16_t profile_len;
   uint16_t encryption_profile;
@@ -32,9 +30,7 @@ struct SrtpEncryptionCtx {
   uint32_t kdr;
 
   struct cipher_suite_info *cipher_suite_info;
-  union {
-    struct AesEnryptionCtx *aes;
-  };
+  struct AesEnryptionCtx *aes;
 };
 
 struct srtp_ext parse_srtp_ext(guchar *value, uint16_t len);

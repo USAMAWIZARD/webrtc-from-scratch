@@ -150,6 +150,9 @@ void init_srtp(struct srtp_ctx **pp_srtp_ctx,
     srtp_key_derivation(srtp_ctx->server, encryption_keys->cipher_suite_info);
   }
 
+  srtp_ctx->encrypt_func = &encrypt_aes;
+  srtp_ctx->decrypt_func = &decrypt_aes;
+
   *pp_srtp_ctx = srtp_ctx;
 }
 

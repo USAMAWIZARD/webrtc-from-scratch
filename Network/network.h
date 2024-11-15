@@ -48,7 +48,8 @@ int get_udp_sock_desc();
 void *packet_listner_thread(void *peer_v);
 
 bool check_if_stun(struct Stun *stun_header);
-struct NetworkPacket *get_parsed_packet(guchar *packet, uint32_t bytes);
+struct NetworkPacket *get_parsed_packet(struct RTCDtlsTransport *dtls_transport,
+                                        guchar *packet, uint32_t bytes);
 int get_candidates_fd_array(struct RTCPeerConnection *peer,
                             struct pollfd **candidate_fd);
 uint32_t hton24(uint32_t host24);

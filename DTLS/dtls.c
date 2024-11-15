@@ -336,8 +336,8 @@ void dtls_symitric_encrypt(struct RTCDtlsTransport *transport) {
     }
   }
 }
-uint8_t make_dtls_packet(struct RTCDtlsTransport *transport, struct iovec *iov,
-                         struct DtlsHeader *dtls_header,
+uint8_t make_dtls_packet(struct RTCDtlsTransport *dtls_transport,
+                         struct iovec *iov, struct DtlsHeader *dtls_header,
                          struct HandshakeHeader *handshake,
                          guchar *dtls_payload, uint32_t payload_len) {
 
@@ -365,17 +365,16 @@ uint8_t make_dtls_packet(struct RTCDtlsTransport *transport, struct iovec *iov,
   ptr = ptr + payload_len;
 
   if (encrypt_packet) {
-    struct dtls_ctx *encryption_ctx = transport->dtls_symitric_encrypt.dtls;
     struct AesEnryptionCtx *client_Ectx =
-        encryption_ctx->client->encryption_ctx;
+        dtls_transport->dtls_ctx->client->encryption_ctx;
 
     iov[iov_len].iov_base = client_Ectx->recordIV;
     iov[iov_len].iov_len = 16;
     iov_len++;
 
     // calculate mac of the packet
-    gsize hmac_len = transport->dtls_cipher_suite->hmac_len;
-    GHmac *hmac = g_hmac_new(transport->dtls_cipher_suite->hmac_algo,
+    gsize hmac_len = dtls_transport->dtls_cipher_suite->hmac_len;
+    GHmac *hmac = g_hmac_new(dtls_transport->dtls_cipher_suite->hmac_algo,
                              client_Ectx->mac_key, client_Ectx->mac_key_size);
     g_hmac_update(hmac, (guchar *)&dtls_header->epoch,
                   8); // copies epoch and seq number
@@ -393,9 +392,8 @@ uint8_t make_dtls_packet(struct RTCDtlsTransport *transport, struct iovec *iov,
     printf("to encrypt \n");
     print_hex(packet, Hheader_payload_len + hmac_len);
 
-    uint32_t enrypted_len = encrypt_aes(
-        client_Ectx, packet, 0,
-        Hheader_payload_len + hmac_len); // set this as a function pointer
+    uint32_t enrypted_len =
+        encrypt_dtls(dtls_transport, packet, Hheader_payload_len + hmac_len);
     print_hex(packet, enrypted_len);
 
     dtls_header->length = htons(enrypted_len + 16); // IV len
@@ -470,32 +468,14 @@ uint16_t make_extentention(struct dtls_ext **ext, uint16_t extention_type,
 void on_dtls_packet(struct NetworkPacket *netowrk_packet,
                     struct RTCPeerConnection *peer) {
 
-  JsonObject *flight = peer->dtls_transport->dtls_flights;
+  struct RTCDtlsTransport *dtls_transport = peer->dtls_transport;
+  JsonObject *flight = dtls_transport->dtls_flights;
   struct DtlsParsedPacket *dtls_packet = netowrk_packet->payload.dtls_parsed;
 
   printf("packet type : %d\n", dtls_packet->dtls_header->type);
 
   while (dtls_packet != NULL) {
 
-    if (dtls_packet->isencrypted) {
-      printf("\n -----------------------"
-             "encrypted dtls packet----------------------- \n");
-
-      dtls_packet = dtls_packet->next_record;
-      // decrept the packet and check if its a finished messaga also verify the
-      // hash of the message
-      printf("%ld", peer->dtls_transport->srtp_symitric_encrypt.srtp->client
-                        ->cipher_suite_info->hmac_len);
-      init_rtp_stream(
-          peer->transceiver->sender->track->rtp_stream,
-          peer->dtls_transport->pair,
-          peer->dtls_transport->srtp_symitric_encrypt.srtp
-              ->client); // change here set it to selected pair in ice not
-
-      start_rtp_stream(peer->transceiver->sender->track->rtp_stream);
-
-      continue;
-    }
     switch (dtls_packet->dtls_header->type) {
     case content_type_change_cipher_spec:
       printf("\n -----------------------"
@@ -504,6 +484,7 @@ void on_dtls_packet(struct NetworkPacket *netowrk_packet,
       continue;
     case content_type_alert:
       printf("allert ----\n");
+      dtls_packet = dtls_packet->next_record;
       continue;
     }
 
@@ -521,8 +502,7 @@ void on_dtls_packet(struct NetworkPacket *netowrk_packet,
     bool was_last_pkt_fragmented = false;
     bool is_this_last_fragment = false;
 
-    store_concated_handshake_msgs(peer->dtls_transport,
-                                  dtls_packet->handshake_header,
+    store_concated_handshake_msgs(dtls_transport, dtls_packet->handshake_header,
                                   dtls_packet->handshake_payload,
                                   fragment_length, dtls_packet->isfragmented);
 
@@ -582,7 +562,7 @@ void on_dtls_packet(struct NetworkPacket *netowrk_packet,
 
       dtls_packet->parsed_handshake_payload.hello = server_hello;
 
-      handle_server_hello(peer->dtls_transport, server_hello, tvl);
+      handle_server_hello(dtls_transport, server_hello, tvl);
       break;
 
     case handshake_type_certificate:
@@ -614,7 +594,7 @@ void on_dtls_packet(struct NetworkPacket *netowrk_packet,
 
       dtls_packet->parsed_handshake_payload.certificate = certificate;
 
-      handle_certificate(peer->dtls_transport, certificate,
+      handle_certificate(dtls_transport, certificate,
                          peer->parsed_remote_desc->fingerprint,
                          peer->parsed_remote_desc->fingerprint_type);
 
@@ -677,8 +657,7 @@ void on_dtls_packet(struct NetworkPacket *netowrk_packet,
         }
       }
 
-      peer->dtls_transport->selected_signatuire_hash_algo =
-          selected_sign_hash_algo;
+      dtls_transport->selected_signatuire_hash_algo = selected_sign_hash_algo;
 
       if (selected_sign_hash_algo == 0) {
         printf("no supported dtls singing hash algo \n");
@@ -689,21 +668,36 @@ void on_dtls_packet(struct NetworkPacket *netowrk_packet,
     case handshake_type_server_hello_done:
       printf("server hello done \n");
 
-      send_certificate(peer->dtls_transport);
-      do_client_key_exchange(peer->dtls_transport);
-      do_certificate_verify(peer->dtls_transport);
-      do_change_cipher_spec(peer->dtls_transport);
-      peer->dtls_transport->current_seq_no = 0;
-      do_client_finished(peer->dtls_transport);
+      send_certificate(dtls_transport);
+      do_client_key_exchange(dtls_transport);
+      do_certificate_verify(dtls_transport);
+      do_change_cipher_spec(dtls_transport);
+      dtls_transport->current_seq_no = 0;
+      do_client_finished(dtls_transport);
 
       printf("master %s\n ",
-             BN_bn2hex(peer->dtls_transport->encryption_keys->master_secret));
-      printf("client heloow %s\n ", BN_bn2hex(peer->dtls_transport->my_random));
+             BN_bn2hex(dtls_transport->encryption_keys->master_secret));
+      printf("client heloow %s\n ", BN_bn2hex(dtls_transport->my_random));
 
       break;
     case handshake_type_finished:
+      printf("------------------------------ recieved dtls finished message "
+             "----------------------------\n");
+      // todo verify hash of all previous messages
       printf("\n -----------------------dtls connection "
              "sucssessfull---------------------------- \n");
+      // todo  pass signal cahnge dtls state to success  also change webrtc
+      // state
+
+      // fix this make robus logic for threading and send it from diffrent
+      // thread
+      init_rtp_stream(
+          peer->transceiver->sender->track->rtp_stream,
+          peer->dtls_transport->pair,
+          dtls_transport->srtp_ctx
+              ->client); // change here set it to selected pair in ice not
+
+      start_rtp_stream(peer->transceiver->sender->track->rtp_stream);
     default:
       break;
     }
@@ -1100,7 +1094,34 @@ bool do_certificate_verify(struct RTCDtlsTransport *transport) {
 
   return false;
 }
-void encrypt_dtls(guchar *block) {}
+// for cbc [iv , data , mac , padding]
+uint32_t encrypt_dtls(struct RTCDtlsTransport *dtls_transport, guchar *block,
+                      uint32_t length) {
+
+  // can handle diffrent mode of encryption here
+  return dtls_transport->dtls_ctx->encrypt_func(
+      dtls_transport->dtls_ctx->client->encryption_ctx, block, 0,
+      length); // set this as a function pointer
+}
+
+uint32_t decrypt_dtls(struct RTCDtlsTransport *dtls_transport, guchar **block,
+                      uint32_t length) {
+  uint32_t hmac_len = dtls_transport->dtls_cipher_suite->hmac_len;
+
+  // can handle diffrent mode of decryption here
+  // block CBC cipher
+  uint32_t len = dtls_transport->dtls_ctx->decrypt_func(
+      dtls_transport->dtls_ctx->server->encryption_ctx, *block, 0, length);
+
+  // todo  verify hash
+  uint16_t padding_len = (*block)[length - 1] + 1;
+  len = len - hmac_len;
+  len = len - padding_len;
+
+  len = len - 16; // minus iv
+  *block = (*block) + 16;
+  return len;
+}
 
 bool do_client_finished(struct RTCDtlsTransport *transport) {
 

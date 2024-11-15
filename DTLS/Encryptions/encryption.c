@@ -126,7 +126,7 @@ get_dtls_encryption_keys(struct RTCDtlsTransport *transport,
   return encryption_keys;
 }
 
-bool init_dtls(union symmetric_encrypt *encryption_ctx,
+bool init_dtls(struct dtls_ctx **encryption_ctx,
                struct encryption_keys *encryption_keys,
                struct cipher_suite_info *cipher_info) {
 
@@ -138,42 +138,24 @@ bool init_dtls(union symmetric_encrypt *encryption_ctx,
   case AES:
 
     if (encryption_keys->client_write_key) {
-      init_aes(&dtls_encrytion_ctx->client->encryption_ctx,
+      init_aes((struct AesEnryptionCtx **)&dtls_encrytion_ctx->client
+                   ->encryption_ctx,
                encryption_keys->client_write_key, cipher_info->key_size,
                encryption_keys->client_write_mac_key, cipher_info->hmac_len,
                encryption_keys->client_write_IV, cipher_info->mode);
     }
 
     if (encryption_keys->server_write_key) {
-      init_aes(&dtls_encrytion_ctx->server->encryption_ctx,
+      init_aes((struct AesEnryptionCtx **)&dtls_encrytion_ctx->server
+                   ->encryption_ctx,
                encryption_keys->server_write_key, cipher_info->key_size,
                encryption_keys->server_write_mac_key, cipher_info->hmac_len,
                encryption_keys->server_write_IV, cipher_info->mode);
     }
+    dtls_encrytion_ctx->encrypt_func = &encrypt_aes;
+    dtls_encrytion_ctx->decrypt_func = &decrypt_aes;
 
-    encryption_ctx->dtls = dtls_encrytion_ctx;
-    break;
-  }
-  return true;
-}
-
-bool init_enryption_ctx(union symmetric_encrypt *symitric_encrypt,
-                        struct encryption_keys *encryption_keys,
-                        struct cipher_suite_info *cipher_info) {
-
-  switch (cipher_info->selected_cipher_suite) {
-  case TLS_RSA_WITH_AES_128_CBC_SHA:
-    init_dtls(symitric_encrypt, encryption_keys, cipher_info);
-
-    break;
-  case SRTP_AES128_CM_HMAC_SHA1_80:
-    init_srtp(&symitric_encrypt->srtp,
-              encryption_keys); // srtp ctx containes an aes context
-
-    break;
-  default:
-    printf("no  such cipher sute supported \n");
-    exit(0);
+    *encryption_ctx = dtls_encrytion_ctx;
     break;
   }
   return true;
@@ -191,8 +173,8 @@ bool init_symitric_encryption(struct RTCDtlsTransport *transport) {
       get_dtls_encryption_keys(transport, key_block);
   free(key_block);
 
-  init_enryption_ctx(&transport->dtls_symitric_encrypt, encryption_keys,
-                     transport->dtls_cipher_suite);
+  init_dtls(&transport->dtls_ctx, encryption_keys,
+            transport->dtls_cipher_suite);
 
   // check if srtp is required SRTP
 
@@ -202,10 +184,9 @@ bool init_symitric_encryption(struct RTCDtlsTransport *transport) {
           G_CHECKSUM_SHA256, 128);
 
   encryption_keys = get_srtp_enryption_keys(transport, key_block);
-  free(key_block);
+  init_srtp(&transport->srtp_ctx, encryption_keys);
 
-  init_enryption_ctx(&transport->srtp_symitric_encrypt, encryption_keys,
-                     transport->srtp_cipher_suite);
+  free(key_block);
 
   return true;
 }

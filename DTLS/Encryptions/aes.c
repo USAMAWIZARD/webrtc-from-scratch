@@ -439,26 +439,32 @@ uint32_t decrypt_aes(struct AesEnryptionCtx *ctx, uint8_t *block_data,
   uint8_t(*block)[4] = block_data + block_decryption_offset;
 
   if (data_len % 16 != 0)
-    g_error("block len should be in multiple of 16");
+    g_error("block len should be in multiple of 16 data len is %d", data_len);
   uint32_t data_dencrytion_itration = (data_len) / AES_BLOCK_SIZE;
 
   transpose_matrix(ctx->IV);
 
   uint8_t counter[16];
-  for (int i = 0; i < data_dencrytion_itration; i++) {
-
-    transpose_matrix(block);
-    if (ctx->mode == CBC) {
+  if (ctx->mode == CBC) {
+    block = block + ((data_dencrytion_itration - 1) * 4);
+    transpose_matrix(block); // startiing from last block to avoid mem copy
+    for (int i = 0; i < data_dencrytion_itration; i++) {
+      transpose_matrix(block - 4);
       aes_dec_opp(ctx, block);
-      add_vector(block, ctx->IV);
-    } else if (ctx->mode == CM) {
+      add_vector(block, block - 4); // passing previous block as iv
+      block = block - 4;
+    }
+  }
+
+  if (ctx->mode == CM)
+    for (int i = 0; i < data_dencrytion_itration; i++) {
+      transpose_matrix(block);
       memcpy(counter, ctx->IV, AES_BLOCK_SIZE);
       aes_enc_opp(ctx, counter);
       add_vector(block, counter);
       increment_counter(ctx->IV);
+      block = block + 4;
     }
-    block = block + 4;
-  }
 
   block = (block_data) + block_decryption_offset;
 
