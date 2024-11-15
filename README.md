@@ -5,7 +5,7 @@
 - [ ] make it browser compatible
 - [ ] add basic security checks
 - [ ] refactor encryption and decryption logic
-- [ ] DTLS decryption
+- [ ] SRTP DTLS decryption ( IN PROGRESS)
 - [ ] Implement state changes for ICE, DTLS, and WebRTC
 - [ ] refactor implementation
 - [ ] Complete DTLS finish message verification
